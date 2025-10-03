@@ -3,7 +3,7 @@
 // ==========================================
 
 // 🔑 GANTI DENGAN PRIVY APP ID ANDA
-export const PRIVY_APP_ID = 'clpispdty00ycl80fpueukbhl';
+export const PRIVY_APP_ID = 'cmgb2kkqc000kkv0d96pfrstl';
 
 // Konfigurasi Contract
 export const CONTRACT_ADDRESS = "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b";
