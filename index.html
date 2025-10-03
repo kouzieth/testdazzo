@@ -1,1123 +1,265 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DOZZO - Onchain Jackpot Game</title>
-    <!-- Ethers.js -->
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js" type="application/javascript"></script>
-    <!-- WalletConnect v2 -->
-    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.9.0/dist/umd/index.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #0f0f23;
-            --card-color: #1a1a2e;
-            --text-color: #ffffff;
-            --muted-text-color: #888888;
-            --highlight-color: #764fff;
-            --border-color: #2d2d4d;
-            --win-color: #00ff88;
-            --error-color: #ff4444;
-            --success-color: #00cc66;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            padding: 1rem;
-            line-height: 1.6;
-        }
-        
-        .container { max-width: 500px; margin: 0 auto; }
-        
-        .hidden { display: none !important; }
-        
-        /* Header Styles */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding: 0 0.5rem;
-        }
-        
-        .title {
-            font-weight: 700;
-            font-size: 1.5rem;
-            background: linear-gradient(45deg, #764fff, #00ff88);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .wallet-section {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .connect-btn {
-            background: var(--highlight-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        
-        .wallet-info {
-            display: none;
-            align-items: center;
-            gap: 0.5rem;
-            background: var(--card-color);
-            padding: 0.5rem;
-            border-radius: 8px;
-            font-size: 0.8rem;
-        }
-        
-        .network-indicator {
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-        
-        .network-base {
-            background: var(--success-color);
-            color: white;
-        }
-        
-        .network-wrong {
-            background: var(--error-color);
-            color: white;
-        }
-        
-        /* Card Styles */
-        .card {
-            background: var(--card-color);
-            border-radius: 16px;
-            padding: 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        
-        .jackpot-card {
-            background: linear-gradient(135deg, var(--card-color), #1a1a3e);
-            text-align: center;
-        }
-        
-        .jackpot-card .title {
-            font-size: 0.9rem;
-            color: var(--muted-text-color);
-            margin-bottom: 0.25rem;
-        }
-        
-        .jackpot-card .amount {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--win-color);
-            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
-        }
-        
-        /* Game Status */
-        .game-status {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            background: rgba(118, 79, 255, 0.1);
-            border-radius: 12px;
-            font-weight: 600;
-        }
-        
-        .time-remaining {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        
-        #timer {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--win-color);
-        }
-        
-        /* Carousel Styles */
-        .carousel-section {
-            margin: 1rem 0;
-        }
-        
-        .waiting-players-wrapper {
-            position: relative;
-            width: 100%;
-            overflow: hidden;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 1rem 0;
-            border: 1px solid var(--border-color);
-        }
-        
-        .winner-marker {
-            position: absolute;
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            transform: translateX(-50%);
-            width: 3px;
-            background: linear-gradient(to bottom, transparent, var(--win-color), transparent);
-            z-index: 5;
-        }
-        
-        .winner-marker::before, .winner-marker::after {
-            content: '';
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-        }
-        
-        .winner-marker::before {
-            top: -1px;
-            border-top: 8px solid var(--win-color);
-        }
-        
-        .winner-marker::after {
-            bottom: -1px;
-            border-bottom: 8px solid var(--win-color);
-        }
-        
-        .waiting-players {
-            display: flex;
-            width: fit-content;
-            transition: transform 5s cubic-bezier(0.2, 0.9, 0.3, 1);
-        }
-        
-        .player-slot {
-            flex-shrink: 0;
-            background: var(--card-color);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 0.75rem;
-            width: 100px;
-            text-align: center;
-            margin: 0 0.5rem;
-            transition: all 0.3s ease;
-        }
-        
-        .player-slot img {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-            margin-bottom: 0.5rem;
-            background: var(--bg-color);
-        }
-        
-        .player-slot .name {
-            font-size: 0.8rem;
-            font-weight: 600;
-            height: 1.2em;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .player-slot .details {
-            font-size: 0.75rem;
-            color: var(--muted-text-color);
-        }
-        
-        .player-slot.waiting {
-            opacity: 0.6;
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        .player-slot.winner {
-            background: linear-gradient(135deg, var(--win-color), #764fff);
-            color: white;
-            transform: scale(1.1);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-        }
-        
-        .player-slot.winner .details {
-            color: white;
-        }
-        
-        /* Betting Section */
-        .input-group {
-            display: flex;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
-        }
-        
-        .input-group input {
-            border: none;
-            outline: none;
-            background: none;
-            color: var(--text-color);
-            font-size: 1.2rem;
-            width: 100%;
-            text-align: center;
-        }
-        
-        .quick-bet-buttons {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .quick-bet-btn {
-            padding: 0.75rem;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-color);
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .quick-bet-btn:active {
-            transform: scale(0.95);
-            background: var(--highlight-color);
-        }
-        
-        button {
-            padding: 1rem;
-            border-radius: 12px;
-            border: none;
-            background: var(--highlight-color);
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1.1rem;
-        }
-        
-        button:active {
-            transform: scale(0.98);
-        }
-        
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        
-        /* Transaction Status */
-        .transaction-status {
-            padding: 1rem;
-            border-radius: 12px;
-            margin: 1rem 0;
-            text-align: center;
-            display: none;
-            border: 1px solid;
-        }
-        
-        .status-pending {
-            background: rgba(255, 193, 7, 0.2);
-            color: #ffc107;
-            border-color: #ffc107;
-        }
-        
-        .status-success {
-            background: rgba(0, 204, 102, 0.2);
-            color: var(--success-color);
-            border-color: var(--success-color);
-        }
-        
-        .status-error {
-            background: rgba(255, 68, 68, 0.2);
-            color: var(--error-color);
-            border-color: var(--error-color);
-        }
-
-        /* Player List */
-        .player-list {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .player-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .player-row:last-child {
-            border-bottom: none;
-        }
-        
-        .player-address {
-            font-family: monospace;
-            font-size: 0.8rem;
-        }
-        
-        .player-bet {
-            color: var(--win-color);
-            font-weight: 600;
-        }
-        
-        /* Loading Animation */
-        .loader {
-            width: 20px;
-            height: 20px;
-            border: 2px solid transparent;
-            border-top: 2px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Winner Animation */
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes winner-glow {
-            0%, 100% { 
-                box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-                transform: scale(1);
-            }
-            50% { 
-                box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
-                transform: scale(1.05);
-            }
-        }
-        
-        .winner-glow {
-            animation: winner-glow 1s ease-in-out 3;
-        }
-
-        /* WalletConnect Modal Fix */
-        .walletconnect-modal__mobile__toggle {
-            color: var(--text-color) !important;
-        }
-        
-        .walletconnect-modal__base {
-            background: var(--card-color) !important;
-        }
-        
-        .walletconnect-modal__header {
-            color: var(--text-color) !important;
-        }
-        
-        .walletconnect-modal__base__row {
-            color: var(--text-color) !important;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Jackpot DApp</title>
+  <style>
+    body {
+      background: #0e0e0e;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    #connect-btn {
+      background: #ff9800;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    #player-entries {
+      margin: 20px auto;
+      max-width: 400px;
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 12px;
+      min-height: 100px;
+    }
+    .player-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 10px;
+      margin: 4px 0;
+      background: #2a2a2a;
+      border-radius: 6px;
+    }
+    .player-address {
+      font-weight: bold;
+    }
+    .player-bet {
+      color: #ff9800;
+    }
+    #countdown {
+      margin-top: 10px;
+      font-size: 20px;
+      color: #ccc;
+    }
+    /* Spinner */
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+    .loading-spinner div {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #666;
+      border-top: 3px solid #ff9800;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* Fade */
+    .fade { opacity: 0; transition: opacity 0.4s ease-in-out; }
+    .fade.show { opacity: 1; }
+    /* Winner Highlight */
+    .winner-highlight {
+      animation: glowWinner 2s ease-in-out 2, scalePop 0.6s ease-out;
+    }
+    @keyframes glowWinner {
+      0% { box-shadow: 0 0 0px rgba(255, 215, 0, 0); }
+      50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.9); }
+      100% { box-shadow: 0 0 0px rgba(255, 215, 0, 0); }
+    }
+    @keyframes scalePop {
+      0% { transform: scale(0.6); opacity: 0; }
+      60% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    /* Carousel Winners */
+    #winner-carousel {
+      margin: 20px auto;
+      max-width: 400px;
+      background: #222;
+      padding: 15px;
+      border-radius: 12px;
+    }
+    .carousel-item {
+      padding: 10px;
+      margin: 6px 0;
+      background: #333;
+      border-radius: 8px;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="title">DOZZO JACKPOT</div>
-            <div class="wallet-section">
-                <div id="wallet-info" class="wallet-info">
-                    <div id="network-indicator" class="network-indicator network-wrong">●</div>
-                    <div id="wallet-address"></div>
-                    <button id="disconnect-wallet" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;">Disconnect</button>
-                </div>
-                <button id="connect-wallet" class="connect-btn">Connect Wallet</button>
-            </div>
-        </header>
+  <h1>🎰 Jackpot DApp</h1>
+  <button id="connect-btn">Connect Wallet</button>
 
-        <div id="transaction-status" class="transaction-status"></div>
+  <div id="player-entries">
+    <div style="padding:1rem; color:#888;">Connect wallet to load players</div>
+  </div>
+  <div>Players: <span id="player-count">0</span></div>
+  <div id="countdown">00:00</div>
 
-        <main>
-            <section class="card jackpot-card">
-                <div class="title">TOTAL JACKPOT</div>
-                <div class="amount" id="jackpot-amount">0.0000 ETH</div>
-                <div style="font-size: 0.8rem; color: var(--muted-text-color); margin-top: 0.5rem;">
-                    Fee 1% | Min Bet: 0.0001 ETH | Round: 1 Minute
-                </div>
-            </section>
+  <h2>🏆 Winners</h2>
+  <div id="winner-carousel">
+    <div style="padding:1rem; color:#888;">No winners yet</div>
+  </div>
 
-            <section class="card game-status">
-                <div class="time-remaining">
-                    <span style="font-size: 0.9rem; color: var(--muted-text-color);">Time Left:</span>
-                    <span id="timer">01:00</span>
-                </div>
-                <div class="round">
-                    <span style="font-size: 0.9rem; color: var(--muted-text-color);">Round</span>
-                    <div>#<span id="round-number">1</span></div>
-                </div>
-            </section>
+  <script type="module">
+    import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js";
+    import { EthereumClient, w3mConnectors, w3mProvider } from "https://cdn.jsdelivr.net/npm/@web3modal/ethereum@2.6.2";
+    import { Web3Modal } from "https://cdn.jsdelivr.net/npm/@web3modal/html@2.6.2";
 
-            <!-- CAROUSEL SECTION -->
-            <section class="card carousel-section">
-                <div class="waiting-players-wrapper">
-                    <div class="winner-marker"></div>
-                    <div class="waiting-players" id="player-carousel">
-                        <!-- Player slots will be generated here -->
-                    </div>
-                </div>
-            </section>
+    // 🔹 Pakai Project ID dari Reown
+    const projectId = "400db8559bcc1daaf0569133ef5198bd"; 
 
-            <section class="card">
-                <div style="margin-bottom: 1rem; color: var(--muted-text-color); text-align: center;">
-                    Place your bet to join the jackpot!
-                </div>
-                <div class="input-group">
-                    <input type="number" id="bet-input" placeholder="0.0000 ETH" step="0.0001" inputmode="decimal" />
-                </div>
-                <div class="quick-bet-buttons">
-                    <button type="button" class="quick-bet-btn" onclick="addBet(0.0005)">+0.0005</button>
-                    <button type="button" class="quick-bet-btn" onclick="addBet(0.001)">+0.001</button>
-                    <button type="button" class="quick-bet-btn" onclick="addBet(0.002)">+0.002</button>
-                </div>
-                <button id="bet-button" class="bet-btn">
-                    <span id="bet-button-text">PLACE BET</span>
-                    <div id="bet-button-loader" class="loader hidden"></div>
-                </button>
-            </section>
+    // 🔹 Chain → Sepolia (karena kontrakmu testnet, bukan mainnet)
+    const chains = [{ id: 11155111, name: "Sepolia Testnet" }];
 
-            <section class="card player-list">
-                <h3 style="margin-bottom: 1rem; color: var(--muted-text-color); text-align: center;">
-                    Current Players (<span id="player-count">0</span>)
-                </h3>
-                <div id="player-entries">
-                    <div style="text-align: center; color: var(--muted-text-color); padding: 2rem;">
-                        No players yet. Be the first to bet!
-                    </div>
-                </div>
-            </section>
+    const ethereumClient = new EthereumClient(
+      w3mConnectors({ projectId, version: 2, chains }),
+      chains,
+      w3mProvider({ projectId, chains })
+    );
+    const web3modal = new Web3Modal({ projectId, themeMode: "dark" }, ethereumClient);
 
-            <section class="card">
-                <h3 style="margin-bottom: 1rem; color: var(--muted-text-color); text-align: center;">
-                    Last Winner
-                </h3>
-                <div id="last-winner-info" style="text-align: center; color: var(--muted-text-color);">
-                    No winners yet. Be the first!
-                </div>
-            </section>
-        </main>
-    </div>
+    let provider, signer, contract;
+    let currentRoundId = "0";
 
-    <script>
-        // ==========================================
-        // KONFIGURASI
-        // ==========================================
-        const CONTRACT_ADDRESS = "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b";
-        const CONTRACT_ABI = [
-            "function placeBet(uint256 _roundId) external payable",
-            "function endRound(uint256 _roundId) external",
-            "function currentRoundId() external view returns (uint256)",
-            "function getRoundInfo(uint256 _roundId) external view returns (uint256 totalPrize, uint256 playerCount, uint256 timeLeft, bool ended, address winner)",
-            "function getPlayerBet(uint256 _roundId, address _player) external view returns (uint256)",
-            "function getRoundPlayers(uint256 _roundId) external view returns (address[] memory)",
-            "function totalJackpot() external view returns (uint256)",
-            "event BetPlaced(address indexed player, uint256 roundId, uint256 amount)",
-            "event RoundEnded(uint256 roundId, address winner, uint256 amount)"
-        ];
+    const connectBtn = document.getElementById("connect-btn");
+    const playerEntries = document.getElementById("player-entries");
+    const playerCount = document.getElementById("player-count");
+    const countdownElement = document.getElementById("countdown");
+    const winnerCarousel = document.getElementById("winner-carousel");
 
-        // WalletConnect Configuration
-        const WALLETCONNECT_PROJECT_ID = "400db8559bcc1daaf0569133ef5198bd"; // Public project ID for testing
-        const BASE_SEPOLIA_CHAIN_ID = "eip155:84532";
+    // 🔹 Contract Address kamu
+    const contractAddress = "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b"; 
 
-        // Global Variables
-        let provider, signer, contract, userAddress, walletConnectProvider;
-        let currentRoundId = 1;
-        let gameInterval;
-        let isSpinning = false;
-        const PROFILE_IMAGE_URL = 'https://i.ibb.co/VMy4P36/P-icon-by-vexel.png';
-        const TOTAL_SLOTS = 20;
+    // 🔹 Minimal ABI contoh (harus sesuai contract jackpot kamu)
+    const contractABI = [
+      "function getCurrentRoundId() view returns (uint256)",
+      "function getRoundPlayers(uint256) view returns (address[])",
+      "function getPlayerBet(uint256,address) view returns (uint256)",
+      "event BetPlaced(uint256 indexed roundId, address indexed player, uint256 amount)",
+      "event RoundEnded(uint256 indexed roundId, address indexed winner, uint256 totalPot)",
+      "event RoundStarted(uint256 indexed roundId, uint256 startTime)"
+    ];
 
-        // DOM Elements
-        const connectWalletBtn = document.getElementById('connect-wallet');
-        const disconnectWalletBtn = document.getElementById('disconnect-wallet');
-        const walletInfo = document.getElementById('wallet-info');
-        const walletAddress = document.getElementById('wallet-address');
-        const networkIndicator = document.getElementById('network-indicator');
-        const betButton = document.getElementById('bet-button');
-        const betButtonText = document.getElementById('bet-button-text');
-        const betButtonLoader = document.getElementById('bet-button-loader');
-        const betInput = document.getElementById('bet-input');
-        const jackpotAmount = document.getElementById('jackpot-amount');
-        const roundNumber = document.getElementById('round-number');
-        const timer = document.getElementById('timer');
-        const playerEntries = document.getElementById('player-entries');
-        const playerCount = document.getElementById('player-count');
-        const lastWinnerInfo = document.getElementById('last-winner-info');
-        const transactionStatus = document.getElementById('transaction-status');
-        const playerCarousel = document.getElementById('player-carousel');
+    connectBtn.addEventListener("click", async () => {
+      try {
+        await web3modal.openModal();
+        const walletProvider = await ethereumClient.getProvider();
+        provider = new ethers.providers.Web3Provider(walletProvider);
+        signer = provider.getSigner();
+        contract = new ethers.Contract(contractAddress, contractABI, signer);
 
-        // Initialize App
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded - initializing app');
-            initApp();
-        });
+        connectBtn.innerText = "Connected ✅";
+        initGame();
+      } catch (err) {
+        console.error("Wallet connect error:", err);
+      }
+    });
 
-        function initApp() {
-            console.log('Initializing app...');
-            
-            // Setup event listeners
-            connectWalletBtn.addEventListener('click', connectWallet);
-            disconnectWalletBtn.addEventListener('click', disconnectWallet);
-            betButton.addEventListener('click', placeBet);
-            
-            // Check if already connected (from session)
-            const savedConnection = localStorage.getItem('walletConnected');
-            if (savedConnection) {
-                tryReconnect();
-            }
-            
-            setupInitialCarousel();
+    async function loadCurrentRound() {
+      currentRoundId = (await contract.getCurrentRoundId()).toString();
+      console.log("Current round:", currentRoundId);
+    }
+
+    async function updatePlayerList() {
+      if (!contract) return;
+      try {
+        const players = await contract.getRoundPlayers(currentRoundId);
+        if (players.length === 0) {
+          playerEntries.innerHTML = `<div style="padding:1rem; color:#888;">No players yet</div>`;
+          playerCount.textContent = "0";
+          return;
         }
-
-        async function tryReconnect() {
-            try {
-                showTransactionStatus('Reconnecting to wallet...', 'pending');
-                
-                // Try to reconnect to WalletConnect
-                walletConnectProvider = await EthereumProvider.init({
-                    projectId: WALLETCONNECT_PROJECT_ID,
-                    chains: [parseInt('84532')],
-                    showQrModal: false
-                });
-                
-                if (walletConnectProvider.connected) {
-                    await handleWalletConnected(walletConnectProvider.accounts[0]);
-                }
-            } catch (error) {
-                console.log('No existing connection found');
-                localStorage.removeItem('walletConnected');
-            }
+        let html = "";
+        for (const player of players) {
+          const betAmount = await contract.getPlayerBet(currentRoundId, player);
+          const formatted = parseFloat(ethers.utils.formatEther(betAmount)).toFixed(4);
+          html += `
+            <div class="player-row fade show">
+              <div class="player-address">${player.substring(0,6)}...${player.substring(player.length-4)}</div>
+              <div class="player-bet">${formatted} ETH</div>
+            </div>`;
         }
+        playerEntries.innerHTML = html;
+        playerCount.textContent = players.length.toString();
+      } catch(e) {
+        console.error("Error updating player list", e);
+      }
+    }
 
-        async function connectWallet() {
-            try {
-                showTransactionStatus('Connecting wallet...', 'pending');
-                
-                // Initialize WalletConnect
-                walletConnectProvider = await EthereumProvider.init({
-                    projectId: WALLETCONNECT_PROJECT_ID,
-                    chains: [parseInt('84532')], // Base Sepolia chainId
-                    showQrModal: true,
-                    qrModalOptions: {
-                        themeMode: "dark",
-                        themeVariables: {
-                            "--wcm-z-index": "9999"
-                        }
-                    }
-                });
-                
-                // Enable session
-                await walletConnectProvider.enable();
-                
-                const accounts = walletConnectProvider.accounts;
-                if (accounts.length > 0) {
-                    await handleWalletConnected(accounts[0]);
-                    localStorage.setItem('walletConnected', 'true');
-                }
-                
-            } catch (error) {
-                console.error('Wallet connection failed:', error);
-                let errorMessage = 'Connection failed';
-                
-                if (error.message.includes('User rejected')) {
-                    errorMessage = 'Connection rejected by user';
-                }
-                
-                showTransactionStatus(errorMessage, 'error');
-            }
+    async function updateCarousel() {
+      winnerCarousel.innerHTML = `
+        <div class="carousel-item">🎉 Winner just added (dummy)</div>
+      `;
+    }
+
+    function setupEventListeners() {
+      if (!contract) return;
+
+      contract.on("BetPlaced", (roundId, player, amount) => {
+        if (roundId.toString() === currentRoundId.toString()) {
+          updatePlayerList();
         }
+      });
 
-        async function handleWalletConnected(address) {
-            console.log('Wallet connected:', address);
-            
-            userAddress = address;
-            
-            // Setup ethers provider with WalletConnect
-            provider = new ethers.providers.Web3Provider(walletConnectProvider);
-            signer = provider.getSigner();
-            contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-            // Update UI
-            connectWalletBtn.style.display = 'none';
-            walletInfo.style.display = 'flex';
-            walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-            
-            await checkNetwork();
-            showTransactionStatus('Wallet connected successfully! 🎉', 'success');
-            
-            // Start loading game data
-            await loadGameData();
-            startGameLoop();
-
-            // Setup WalletConnect event listeners
-            walletConnectProvider.on("accountsChanged", handleAccountsChanged);
-            walletConnectProvider.on("chainChanged", handleChainChanged);
-            walletConnectProvider.on("disconnect", handleDisconnect);
+      contract.on("RoundEnded", async (roundId, winner, totalPot) => {
+        if (roundId.toString() === currentRoundId.toString()) {
+          await updateCarousel();
+          const items = document.querySelectorAll(".carousel-item");
+          if (items.length > 0) {
+            const latest = items[0];
+            latest.classList.add("winner-highlight");
+            setTimeout(() => latest.classList.remove("winner-highlight"), 4000);
+          }
+          startNewRound();
         }
+      });
 
-        async function checkNetwork() {
-            try {
-                const chainId = await walletConnectProvider.request({ method: 'eth_chainId' });
-                console.log('Current chainId:', chainId);
-                
-                if (chainId === '0x14a34') { // Base Sepolia
-                    networkIndicator.textContent = 'Base Sepolia';
-                    networkIndicator.className = 'network-indicator network-base';
-                } else {
-                    networkIndicator.textContent = 'Wrong Network';
-                    networkIndicator.className = 'network-indicator network-wrong';
-                    showTransactionStatus('Please switch to Base Sepolia', 'error');
-                }
-            } catch (error) {
-                console.error('Error checking network:', error);
-            }
-        }
+      contract.on("RoundStarted", (roundId) => {
+        currentRoundId = roundId.toString();
+        updatePlayerList();
+      });
+    }
 
-        function disconnectWallet() {
-            console.log('Disconnecting wallet');
-            
-            if (walletConnectProvider) {
-                walletConnectProvider.disconnect();
-            }
-            
-            userAddress = null;
-            contract = null;
-            walletConnectProvider = null;
-            
-            // Reset UI
-            connectWalletBtn.style.display = 'block';
-            walletInfo.style.display = 'none';
-            walletAddress.textContent = '';
-            
-            // Stop game loop
-            if (gameInterval) {
-                clearInterval(gameInterval);
-            }
-            
-            // Clear localStorage
-            localStorage.removeItem('walletConnected');
-            
-            showTransactionStatus('Wallet disconnected', 'success');
-        }
+    async function startNewRound() {
+      try {
+        playerEntries.classList.remove("show");
+        playerEntries.classList.add("fade");
+        setTimeout(() => {
+          playerEntries.innerHTML = `<div class="loading-spinner"><div></div></div>`;
+          playerCount.textContent = "0";
+          countdownElement.textContent = "00:00";
+          playerEntries.classList.add("show");
+        }, 200);
 
-        function handleAccountsChanged(accounts) {
-            console.log('Accounts changed:', accounts);
-            if (accounts.length === 0) {
-                disconnectWallet();
-            } else if (accounts[0] !== userAddress) {
-                handleWalletConnected(accounts[0]);
-            }
-        }
+        await new Promise(r => setTimeout(r, 1200));
+        await loadCurrentRound();
+        await updatePlayerList();
+        playerEntries.classList.add("show");
+      } catch(e) {
+        console.error("Error new round", e);
+      }
+    }
 
-        function handleChainChanged(chainId) {
-            console.log('Chain changed:', chainId);
-            window.location.reload();
-        }
-
-        function handleDisconnect() {
-            console.log('WalletConnect disconnected');
-            disconnectWallet();
-        }
-
-        // Carousel Functions
-        function setupInitialCarousel() {
-            const singlePass = Array.from({ length: TOTAL_SLOTS }, (_, i) => 
-                `<div class="player-slot waiting" data-slot-id="${i}">
-                    <img src="${PROFILE_IMAGE_URL}" alt="waiting">
-                    <div class="name">Waiting...</div>
-                    <div class="details">0.0000 ETH</div>
-                </div>`
-            ).join('');
-            
-            playerCarousel.innerHTML = singlePass + singlePass;
-            
-            // Add CSS for idle animation
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes continuous-slide {
-                    from { transform: translateX(0); }
-                    to { transform: translateX(-50%); }
-                }
-                .idle-slide {
-                    animation: continuous-slide 30s linear infinite;
-                }
-            `;
-            document.head.appendChild(style);
-            
-            playerCarousel.classList.add('idle-slide');
-        }
-
-        async function updateCarouselWithPlayers() {
-            if (!contract) return;
-
-            try {
-                const players = await contract.getRoundPlayers(currentRoundId);
-                const playerBets = await Promise.all(
-                    players.map(async (player) => {
-                        const bet = await contract.getPlayerBet(currentRoundId, player);
-                        return {
-                            address: player,
-                            bet: parseFloat(ethers.utils.formatEther(bet)).toFixed(4)
-                        };
-                    })
-                );
-
-                updateCarousel(playerBets);
-            } catch (error) {
-                console.error('Error updating carousel:', error);
-            }
-        }
-
-        function updateCarousel(players) {
-            // Clear all slots first
-            const allSlots = playerCarousel.querySelectorAll('.player-slot');
-            allSlots.forEach(slot => {
-                slot.className = 'player-slot waiting';
-                slot.innerHTML = `
-                    <img src="${PROFILE_IMAGE_URL}" alt="waiting">
-                    <div class="name">Waiting...</div>
-                    <div class="details">0.0000 ETH</div>
-                `;
-            });
-
-            // Fill with actual players
-            players.forEach((player, index) => {
-                const slotIndex = index % TOTAL_SLOTS;
-                const slots = document.querySelectorAll(`.player-slot[data-slot-id="${slotIndex}"]`);
-                
-                slots.forEach(slot => {
-                    slot.classList.remove('waiting');
-                    slot.innerHTML = `
-                        <img src="${PROFILE_IMAGE_URL}" alt="${player.address}">
-                        <div class="name">${player.address.substring(0, 6)}...${player.address.substring(player.address.length - 4)}</div>
-                        <div class="details">${player.bet} ETH</div>
-                    `;
-                });
-            });
-
-            // Add idle animation if not spinning
-            if (!isSpinning) {
-                playerCarousel.classList.add('idle-slide');
-            }
-        }
-
-        async function spinToWinner(winnerAddress) {
-            if (!contract) return;
-            
-            isSpinning = true;
-            playerCarousel.classList.remove('idle-slide');
-            
-            try {
-                const players = await contract.getRoundPlayers(currentRoundId);
-                const playerBets = await Promise.all(
-                    players.map(async (player) => {
-                        const bet = await contract.getPlayerBet(currentRoundId, player);
-                        return {
-                            address: player,
-                            bet: ethers.utils.formatEther(bet)
-                        };
-                    })
-                );
-
-                // Create multiple copies for smooth spinning
-                const spinningPlayers = [];
-                for (let i = 0; i < 5; i++) {
-                    spinningPlayers.push(...playerBets);
-                }
-
-                // Find winner index
-                const winnerIndex = playerBets.findIndex(p => p.address.toLowerCase() === winnerAddress.toLowerCase());
-                const targetPosition = (4 * playerBets.length) + winnerIndex;
-
-                // Calculate target translateX
-                const slotWidth = 100 + 16; // width + margin
-                const targetTranslateX = -(targetPosition * slotWidth) + (playerCarousel.parentElement.offsetWidth / 2) - (slotWidth / 2);
-
-                // Add some random offset for excitement
-                const randomOffset = (Math.random() - 0.5) * (slotWidth * 0.3);
-                const finalTranslateX = targetTranslateX + randomOffset;
-
-                // Apply spinning animation
-                playerCarousel.style.transition = 'transform 4s cubic-bezier(0.2, 0.9, 0.3, 1)';
-                playerCarousel.style.transform = `translateX(${finalTranslateX}px)`;
-
-                // Highlight winner after spin
-                setTimeout(() => {
-                    const allSlots = playerCarousel.querySelectorAll('.player-slot');
-                    allSlots.forEach((slot, index) => {
-                        if (index % playerBets.length === winnerIndex) {
-                            slot.classList.add('winner', 'winner-glow');
-                        }
-                    });
-                    
-                    showTransactionStatus(`🎉 Winner: ${winnerAddress.substring(0, 6)}...${winnerAddress.substring(winnerAddress.length - 4)} won the jackpot!`, 'success');
-                    
-                    // Reset after celebration
-                    setTimeout(() => {
-                        isSpinning = false;
-                        playerCarousel.classList.add('idle-slide');
-                    }, 3000);
-                    
-                }, 4200);
-
-            } catch (error) {
-                console.error('Error during spin animation:', error);
-                isSpinning = false;
-            }
-        }
-
-        async function loadGameData() {
-            if (!contract) {
-                console.log('No contract available');
-                return;
-            }
-
-            try {
-                console.log('Loading game data...');
-                
-                // Get current round
-                currentRoundId = await contract.currentRoundId();
-                console.log('Current round:', currentRoundId.toString());
-                roundNumber.textContent = currentRoundId.toString();
-
-                // Get round info
-                const roundInfo = await contract.getRoundInfo(currentRoundId);
-                console.log('Round info:', roundInfo);
-                
-                // Update UI with round info
-                updateGameUI(roundInfo);
-
-                // Get total jackpot
-                const totalJackpotValue = await contract.totalJackpot();
-                const jackpotInEth = ethers.utils.formatEther(totalJackpotValue);
-                jackpotAmount.textContent = `${parseFloat(jackpotInEth).toFixed(4)} ETH`;
-
-                // Update carousel with current players
-                await updateCarouselWithPlayers();
-
-            } catch (error) {
-                console.error('Error loading game data:', error);
-                if (error.message.includes('contract')) {
-                    showTransactionStatus('Contract not found. Please check contract address.', 'error');
-                }
-            }
-        }
-
-        function updateGameUI(roundInfo) {
-            // Update timer
-            const timeLeft = parseInt(roundInfo.timeLeft.toString());
-            console.log('Time left:', timeLeft);
-            updateTimerDisplay(timeLeft);
-
-            // Update player count
-            playerCount.textContent = roundInfo.playerCount.toString();
-
-            // Update player list if there are players
-            if (roundInfo.playerCount > 0) {
-                updatePlayerList();
-            } else {
-                playerEntries.innerHTML = `
-                    <div style="text-align: center; color: var(--muted-text-color); padding: 2rem;">
-                        No players yet. Be the first to bet!
-                    </div>
-                `;
-            }
-
-            // Check if round just ended and we have a winner
-            if (roundInfo.ended && roundInfo.winner !== ethers.constants.AddressZero && !isSpinning) {
-                spinToWinner(roundInfo.winner);
-                
-                lastWinnerInfo.innerHTML = `
-                    <div style="color: var(--win-color); font-weight: bold; font-size: 1.1rem;">
-                        ${roundInfo.winner.substring(0, 6)}...${roundInfo.winner.substring(roundInfo.winner.length - 4)}
-                    </div>
-                    <div style="font-size: 0.9rem; margin-top: 0.5rem;">
-                        Won ${ethers.utils.formatEther(roundInfo.totalPrize)} ETH
-                    </div>
-                `;
-                lastWinnerInfo.classList.add('pulse');
-            } else if (roundInfo.winner !== ethers.constants.AddressZero) {
-                lastWinnerInfo.innerHTML = `
-                    <div style="color: var(--win-color); font-weight: bold; font-size: 1.1rem;">
-                        ${roundInfo.winner.substring(0, 6)}...${roundInfo.winner.substring(roundInfo.winner.length - 4)}
-                    </div>
-                    <div style="font-size: 0.9rem; margin-top: 0.5rem;">
-                        Won ${ethers.utils.formatEther(roundInfo.totalPrize)} ETH
-                    </div>
-                `;
-            }
-        }
-
-        async function updatePlayerList() {
-            if (!contract) return;
-
-            try {
-                const players = await contract.getRoundPlayers(currentRoundId);
-                console.log('Players:', players);
-                
-                let playersHTML = '';
-
-                for (const player of players) {
-                    const betAmount = await contract.getPlayerBet(currentRoundId, player);
-                    const betInEth = ethers.utils.formatEther(betAmount);
-                    
-                    playersHTML += `
-                        <div class="player-row">
-                            <div class="player-address">
-                                ${player.substring(0, 8)}...${player.substring(player.length - 6)}
-                            </div>
-                            <div class="player-bet">
-                                ${parseFloat(betInEth).toFixed(4)} ETH
-                            </div>
-                        </div>
-                    `;
-                }
-
-                playerEntries.innerHTML = playersHTML;
-            } catch (error) {
-                console.error('Error updating player list:', error);
-            }
-        }
-
-        function updateTimerDisplay(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            timer.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-            
-            if (seconds < 10) {
-                timer.style.color = 'var(--error-color)';
-            } else if (seconds < 30) {
-                timer.style.color = 'var(--highlight-color)';
-            } else {
-                timer.style.color = 'var(--win-color)';
-            }
-        }
-
-        async function placeBet() {
-            if (!userAddress) {
-                showTransactionStatus('Please connect your wallet first!', 'error');
-                return;
-            }
-
-            if (!contract) {
-                showTransactionStatus('Contract not configured.', 'error');
-                return;
-            }
-
-            const betValue = parseFloat(betInput.value);
-            if (isNaN(betValue) || betValue < 0.0001) {
-                showTransactionStatus('Minimum bet is 0.0001 ETH', 'error');
-                return;
-            }
-
-            try {
-                showTransactionStatus('Processing your bet...', 'pending');
-                setButtonLoading(true);
-
-                const betAmount = ethers.utils.parseEther(betValue.toString());
-                console.log('Placing bet:', betValue, 'ETH');
-                
-                const tx = await contract.placeBet(currentRoundId, { value: betAmount });
-                showTransactionStatus('Transaction submitted. Waiting for confirmation...', 'pending');
-                
-                const receipt = await tx.wait();
-                console.log('Transaction confirmed:', receipt);
-                showTransactionStatus('Bet placed successfully! 🎉 Good luck!', 'success');
-                
-                // Reload game data to reflect changes
-                await loadGameData();
-                betInput.value = '';
-                
-            } catch (error) {
-                console.error('Bet failed:', error);
-                let errorMessage = 'Transaction failed';
-                
-                if (error.message.includes('insufficient funds')) {
-                    errorMessage = 'Insufficient ETH balance';
-                } else if (error.message.includes('user rejected') || error.message.includes('denied')) {
-                    errorMessage = 'Transaction cancelled by user';
-                } else if (error.message.includes('Round ended')) {
-                    errorMessage = 'Round has ended. Please wait for next round';
-                } else if (error.message.includes('Invalid round')) {
-                    errorMessage = 'Round has ended. Refreshing...';
-                    await loadGameData();
-                } else if (error.message.includes('execution reverted')) {
-                    errorMessage = 'Contract error. Please check round status.';
-                }
-                
-                showTransactionStatus(errorMessage, 'error');
-            } finally {
-                setButtonLoading(false);
-            }
-        }
-
-        function setButtonLoading(loading) {
-            betButton.disabled = loading;
-            if (loading) {
-                betButtonText.style.display = 'none';
-                betButtonLoader.classList.remove('hidden');
-            } else {
-                betButtonText.style.display = 'block';
-                betButtonLoader.classList.add('hidden');
-            }
-        }
-
-        function addBet(amount) {
-            const current = parseFloat(betInput.value) || 0;
-            betInput.value = (current + amount).toFixed(4);
-        }
-
-        function showTransactionStatus(message, type) {
-            transactionStatus.textContent = message;
-            transactionStatus.className = `transaction-status status-${type}`;
-            transactionStatus.style.display = 'block';
-            
-            if (type !== 'pending') {
-                setTimeout(() => {
-                    transactionStatus.style.display = 'none';
-                }, 5000);
-            }
-        }
-
-        function startGameLoop() {
-            // Clear any existing interval
-            if (gameInterval) {
-                clearInterval(gameInterval);
-            }
-            
-            // Update game data every 10 seconds
-            gameInterval = setInterval(async () => {
-                if (contract && userAddress) {
-                    console.log('Auto-updating game data...');
-                    await loadGameData();
-                }
-            }, 10000);
-        }
-
-        window.addEventListener('beforeunload', () => {
-            if (gameInterval) {
-                clearInterval(gameInterval);
-            }
-        });
-    </script>
+    async function initGame() {
+      await loadCurrentRound();
+      await updatePlayerList();
+      await updateCarousel();
+      setupEventListeners();
+    }
+  </script>
 </body>
-            </html>
+</html>
