@@ -4,11 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DOZZO - Onchain Jackpot Game</title>
-    <!-- Ethers.js -->
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js" type="application/javascript"></script>
-    <!-- Privy SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js" type="application/javascript"></script>
     <script src="https://unpkg.com/@privy-io/react-auth/dist/index.umd.js"></script>
-    <!-- Styles -->
     <link rel="stylesheet" href="styles/style.css">
 </head>
 <body>
@@ -47,13 +44,11 @@
                 </div>
             </section>
 
-            <!-- CAROUSEL SECTION -->
             <section class="card carousel-section">
                 <div class="waiting-players-wrapper">
                     <div class="winner-marker"></div>
                     <div class="waiting-players" id="player-carousel">
-                        <!-- Player slots will be generated here -->
-                    </div>
+                        </div>
                 </div>
             </section>
 
@@ -97,7 +92,6 @@
         </main>
     </div>
 
-    <!-- Scripts -->
     <script src="scripts/app.js"></script>
     <script src="scripts/wallet.js"></script>
     <script src="scripts/game.js"></script>
