@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privy Minimal Test</title>
+    <script src="https://unpkg.com/@privy-io/sdk-auth@latest/dist/index.umd.js"></script>
+</head>
+<body style="font-family: sans-serif; background-color: #111; color: #eee; text-align: center; padding: 50px;">
+
+    <h1>Privy Connection Test</h1>
+    <p>Jika tombol di bawah ini muncul dan bisa diklik untuk login, maka koneksi ke Privy berhasil.</p>
+
+    <button id="login-button" style="padding: 10px 20px; font-size: 16px;">Login with Privy</button>
+
+    <script>
+        // Ganti dengan Privy App ID Anda
+        const PRIVY_APP_ID = 'cmgb2kkqc000kkv0d96pfrstl';
+
+        // 2. Inisialisasi Privy Client
+        const privy = new window.Privy.PrivyClient({
+            appId: PRIVY_APP_ID,
+            config: {
+                loginMethods: ['farcaster', 'wallet'],
+            }
+        });
+
+        // Tambahkan event listener ke tombol
+        const loginButton = document.getElementById('login-button');
+        loginButton.addEventListener('click', async () => {
+            try {
+                console.log('Attempting to login with Privy...');
+                await privy.login();
+                console.log('Privy login process initiated.');
+            } catch (error) {
+                console.error('Privy login failed:', error);
+            }
+        });
+    </script>
+
+</body>
+</html>
