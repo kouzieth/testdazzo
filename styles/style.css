@@ -1,0 +1,413 @@
+:root {
+    --bg-color: #0f0f23;
+    --card-color: #1a1a2e;
+    --text-color: #ffffff;
+    --muted-text-color: #888888;
+    --highlight-color: #764fff;
+    --border-color: #2d2d4d;
+    --win-color: #00ff88;
+    --error-color: #ff4444;
+    --success-color: #00cc66;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    padding: 1rem;
+    line-height: 1.6;
+}
+
+.container { max-width: 500px; margin: 0 auto; }
+
+.hidden { display: none !important; }
+
+/* Header Styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 0 0.5rem;
+}
+
+.title {
+    font-weight: 700;
+    font-size: 1.5rem;
+    background: linear-gradient(45deg, #764fff, #00ff88);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.wallet-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.connect-btn {
+    background: var(--highlight-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wallet-info {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card-color);
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+
+.network-indicator {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.network-base {
+    background: var(--success-color);
+    color: white;
+}
+
+.network-wrong {
+    background: var(--error-color);
+    color: white;
+}
+
+/* Card Styles */
+.card {
+    background: var(--card-color);
+    border-radius: 16px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.jackpot-card {
+    background: linear-gradient(135deg, var(--card-color), #1a1a3e);
+    text-align: center;
+}
+
+.jackpot-card .title {
+    font-size: 0.9rem;
+    color: var(--muted-text-color);
+    margin-bottom: 0.25rem;
+}
+
+.jackpot-card .amount {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--win-color);
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+/* Game Status */
+.game-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(118, 79, 255, 0.1);
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.time-remaining {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+#timer {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--win-color);
+}
+
+/* Carousel Styles */
+.carousel-section {
+    margin: 1rem 0;
+}
+
+.waiting-players-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem 0;
+    border: 1px solid var(--border-color);
+}
+
+.winner-marker {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: 3px;
+    background: linear-gradient(to bottom, transparent, var(--win-color), transparent);
+    z-index: 5;
+}
+
+.winner-marker::before, .winner-marker::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+}
+
+.winner-marker::before {
+    top: -1px;
+    border-top: 8px solid var(--win-color);
+}
+
+.winner-marker::after {
+    bottom: -1px;
+    border-bottom: 8px solid var(--win-color);
+}
+
+.waiting-players {
+    display: flex;
+    width: fit-content;
+    transition: transform 5s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.player-slot {
+    flex-shrink: 0;
+    background: var(--card-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.75rem;
+    width: 100px;
+    text-align: center;
+    margin: 0 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.player-slot img {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    margin-bottom: 0.5rem;
+    background: var(--bg-color);
+}
+
+.player-slot .name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    height: 1.2em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-slot .details {
+    font-size: 0.75rem;
+    color: var(--muted-text-color);
+}
+
+.player-slot.waiting {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.player-slot.winner {
+    background: linear-gradient(135deg, var(--win-color), #764fff);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+}
+
+.player-slot.winner .details {
+    color: white;
+}
+
+/* Betting Section */
+.input-group {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.input-group input {
+    border: none;
+    outline: none;
+    background: none;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    width: 100%;
+    text-align: center;
+}
+
+.quick-bet-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.quick-bet-btn {
+    padding: 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-color);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-bet-btn:active {
+    transform: scale(0.95);
+    background: var(--highlight-color);
+}
+
+button {
+    padding: 1rem;
+    border-radius: 12px;
+    border: none;
+    background: var(--highlight-color);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1.1rem;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Transaction Status */
+.transaction-status {
+    padding: 1rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+    text-align: center;
+    display: none;
+    border: 1px solid;
+}
+
+.status-pending {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+.status-success {
+    background: rgba(0, 204, 102, 0.2);
+    color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.status-error {
+    background: rgba(255, 68, 68, 0.2);
+    color: var(--error-color);
+    border-color: var(--error-color);
+}
+
+/* Player List */
+.player-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.player-row:last-child {
+    border-bottom: none;
+}
+
+.player-address {
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.player-bet {
+    color: var(--win-color);
+    font-weight: 600;
+}
+
+/* Loading Animation */
+.loader {
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Winner Animation */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes winner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
+        transform: scale(1.05);
+    }
+}
+
+.winner-glow {
+    animation: winner-glow 1s ease-in-out 3;
+}
+
+/* Carousel Animation */
+@keyframes continuous-slide {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+.idle-slide {
+    animation: continuous-slide 30s linear infinite;
+  }
