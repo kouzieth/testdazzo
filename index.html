@@ -498,11 +498,13 @@
         </main>
     </div>
 
+    <!-- Load Reown SDK -->
+    <script src="https://reown.com/appkit.js"></script>
     <script>
         // ==========================================
         // KONFIGURASI
         // ==========================================
-        const CONTRACT_ADDRESS = "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b";
+        const CONTRACT_ADDRESS = "0x6f09eeC6Bdc028C9aCc2a247022C95C4f5C1acCE";
         const CONTRACT_ABI = [
             "function placeBet(uint256 _roundId) external payable",
             "function endRound(uint256 _roundId) external",
@@ -515,22 +517,11 @@
             "event RoundEnded(uint256 roundId, address winner, uint256 amount)"
         ];
 
-        // Base Sepolia Configuration
-        const BASE_SEPOLIA_CHAIN_ID = "0x14A34"; // 84009 in decimal
-        const BASE_SEPOLIA_CONFIG = {
-            chainId: BASE_SEPOLIA_CHAIN_ID,
-            chainName: "Base Sepolia",
-            rpcUrls: ["https://sepolia.base.org"],
-            nativeCurrency: {
-                name: "Base Sepolia ETH",
-                symbol: "ETH",
-                decimals: 18
-            },
-            blockExplorerUrls: ["https://sepolia.basescan.org"]
-        };
+        // Reown Configuration
+        const projectId = '400db8559bcc1daaf0569133ef5198bd';
 
         // Global Variables
-        let provider, signer, contract, userAddress;
+        let provider, signer, contract, userAddress, reown;
         let currentRoundId = 1;
         let gameInterval;
         let isSpinning = false;
@@ -556,14 +547,64 @@
         const transactionStatus = document.getElementById('transaction-status');
         const playerCarousel = document.getElementById('player-carousel');
 
+        // Initialize Reown setelah SDK load
+        function initializeReown() {
+            try {
+                reown = window.reown.createAppKit({
+                    projectId: projectId,
+                    metadata: {
+                        name: "DOZZO Jackpot",
+                        description: "Onchain Jackpot Game",
+                        url: window.location.href,
+                        icons: ["https://avatars.githubusercontent.com/u/37784886"]
+                    },
+                    chains: ["base-sepolia"],
+                    themeMode: "dark"
+                });
+
+                console.log('Reown initialized successfully');
+                
+                // Setup event listeners untuk Reown
+                reown.subscribe('state', (state) => {
+                    console.log('Reown state changed:', state);
+                    if (state.accounts && state.accounts.length > 0) {
+                        handleWalletConnected(state.accounts[0]);
+                    } else {
+                        disconnectWallet();
+                    }
+                });
+
+                // Check jika sudah connected
+                if (reown.state.accounts && reown.state.accounts.length > 0) {
+                    handleWalletConnected(reown.state.accounts[0]);
+                }
+
+            } catch (error) {
+                console.error('Failed to initialize Reown:', error);
+                showTransactionStatus('Failed to initialize wallet connection', 'error');
+            }
+        }
+
         // Initialize App
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded - initializing app');
             
-            initApp();
+            // Tunggu Reown SDK selesai load
+            if (window.reown) {
+                initializeReown();
+            } else {
+                // Fallback: coba lagi setelah delay
+                setTimeout(() => {
+                    if (window.reown) {
+                        initializeReown();
+                    } else {
+                        showTransactionStatus('Wallet SDK failed to load. Please refresh the page.', 'error');
+                        connectWalletBtn.disabled = true;
+                    }
+                }, 2000);
+            }
             
-            // Check if wallet is already connected
-            checkIfWalletConnected();
+            initApp();
         });
 
         function initApp() {
@@ -577,83 +618,21 @@
             setupInitialCarousel();
         }
 
-        // Check if wallet is already connected (e.g., page refresh)
-        async function checkIfWalletConnected() {
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                    if (accounts.length > 0) {
-                        // User is already connected
-                        await handleWalletConnected(accounts[0]);
-                    }
-                } catch (error) {
-                    console.error('Error checking connected accounts:', error);
-                }
-            }
-        }
-
         async function connectWallet() {
-            if (typeof window.ethereum === 'undefined') {
-                showTransactionStatus('No Ethereum wallet detected. Please install MetaMask or another compatible wallet.', 'error');
+            if (!reown) {
+                showTransactionStatus('Wallet connection not ready. Please wait...', 'error');
                 return;
             }
 
             try {
-                showTransactionStatus('Connecting to wallet...', 'pending');
+                showTransactionStatus('Opening wallet selector...', 'pending');
                 
-                // 1. Request account access
-                const accounts = await window.ethereum.request({ 
-                    method: 'eth_requestAccounts' 
-                });
-                
-                // 2. Check current network and switch if needed
-                await checkAndSwitchNetwork();
-                
-                // 3. Handle wallet connection
-                await handleWalletConnected(accounts[0]);
+                // Open Reown modal
+                await reown.open();
                 
             } catch (error) {
                 console.error('Wallet connection failed:', error);
-                let errorMessage = 'Connection failed';
-                
-                if (error.code === 4001) {
-                    errorMessage = 'Connection rejected by user';
-                } else if (error.code === -32002) {
-                    errorMessage = 'Connection request already pending';
-                }
-                
-                showTransactionStatus(errorMessage, 'error');
-            }
-        }
-
-        async function checkAndSwitchNetwork() {
-            try {
-                const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-                
-                if (currentChainId !== BASE_SEPOLIA_CHAIN_ID) {
-                    showTransactionStatus('Switching to Base Sepolia network...', 'pending');
-                    
-                    try {
-                        // Try to switch to Base Sepolia
-                        await window.ethereum.request({
-                            method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: BASE_SEPOLIA_CHAIN_ID }]
-                        });
-                    } catch (switchError) {
-                        // If the network hasn't been added to the wallet, add it
-                        if (switchError.code === 4902) {
-                            await window.ethereum.request({
-                                method: 'wallet_addEthereumChain',
-                                params: [BASE_SEPOLIA_CONFIG]
-                            });
-                        } else {
-                            throw switchError;
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Network switch failed:', error);
-                throw error;
+                showTransactionStatus('Connection failed: ' + error.message, 'error');
             }
         }
 
@@ -663,8 +642,9 @@
             userAddress = address;
             
             try {
-                // Setup ethers.js provider and signer
-                provider = new ethers.providers.Web3Provider(window.ethereum);
+                // Dapatkan provider dari Reown
+                const web3Provider = await reown.getWalletProvider();
+                provider = new ethers.providers.Web3Provider(web3Provider);
                 signer = provider.getSigner();
                 contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
@@ -673,16 +653,12 @@
                 walletInfo.style.display = 'flex';
                 walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
                 
-                await updateNetworkStatus();
+                await checkNetwork();
                 showTransactionStatus('Wallet connected successfully! 🎉', 'success');
                 
                 // Start loading game data
                 await loadGameData();
                 startGameLoop();
-                
-                // Listen for network changes
-                window.ethereum.on('chainChanged', handleChainChanged);
-                window.ethereum.on('accountsChanged', handleAccountsChanged);
                 
             } catch (error) {
                 console.error('Error setting up wallet connection:', error);
@@ -690,13 +666,13 @@
             }
         }
 
-        async function updateNetworkStatus() {
+        async function checkNetwork() {
             try {
                 if (provider) {
                     const network = await provider.getNetwork();
                     console.log('Current network:', network);
                     
-                    if (network.chainId === 84532) { // Base Sepolia (84009 in decimal)
+                    if (network.chainId === 84532) { // Base Sepolia
                         networkIndicator.textContent = 'Base Sepolia';
                         networkIndicator.className = 'network-indicator network-base';
                     } else {
@@ -710,26 +686,13 @@
             }
         }
 
-        function handleChainChanged(chainId) {
-            console.log('Chain changed:', chainId);
-            // Reload the page when network changes
-            window.location.reload();
-        }
-
-        function handleAccountsChanged(accounts) {
-            console.log('Accounts changed:', accounts);
-            if (accounts.length === 0) {
-                // User disconnected their wallet
-                disconnectWallet();
-            } else {
-                // User switched accounts
-                userAddress = accounts[0];
-                walletAddress.textContent = `${userAddress.substring(0, 6)}...${userAddress.substring(userAddress.length - 4)}`;
-            }
-        }
-
         function disconnectWallet() {
             console.log('Disconnecting wallet');
+            
+            // Disconnect dari Reown
+            if (reown) {
+                reown.disconnect();
+            }
             
             userAddress = null;
             contract = null;
@@ -745,15 +708,10 @@
                 clearInterval(gameInterval);
             }
             
-            // Remove event listeners
-            if (window.ethereum) {
-                window.ethereum.removeListener('chainChanged', handleChainChanged);
-                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-            }
-            
             showTransactionStatus('Wallet disconnected', 'success');
         }
 
+        // ... (fungsi carousel, game logic, dan lainnya tetap sama seperti sebelumnya)
         // Carousel Functions
         function setupInitialCarousel() {
             const singlePass = Array.from({ length: TOTAL_SLOTS }, (_, i) => 
@@ -1136,4 +1094,4 @@
         });
     </script>
 </body>
-  </html>
+</html>
