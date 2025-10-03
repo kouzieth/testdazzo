@@ -8,7 +8,7 @@ window.app = {
     PRIVY_APP_ID: 'cmgb2kkqc000kkv0d96pfrstl', // ⚠️ Ganti dengan App ID Anda!
 
     // Konfigurasi Contract
-    CONTRACT_ADDRESS: "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b",
+    CONTRACT_ADDRESS: "0x6f09eeC6Bdc028C9aCc2a247022C95C4f5C1acCE",
     CONTRACT_ABI: [
         "function placeBet(uint256 _roundId) external payable",
         "function endRound(uint256 _roundId) external",
@@ -22,7 +22,7 @@ window.app = {
     ],
 
     // Konfigurasi Game
-    PROFILE_IMAGE_URL: 'https://i.ibb.co/VMy4P36/P-icon-by-vexel.png',
+    PROFILE_IMAGE_URL: '',
     TOTAL_SLOTS: 20,
 
     // Variabel Global (akan diisi nanti)
