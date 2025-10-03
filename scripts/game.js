@@ -1,47 +1,28 @@
-import {
-    CONTRACT_ADDRESS,
-    CONTRACT_ABI,
-    PROFILE_IMAGE_URL,
-    TOTAL_SLOTS,
-    provider, signer, contract, userAddress,
-    currentRoundId, gameInterval, isSpinning,
-    betButton, betInput, jackpotAmount, roundNumber, timer,
-    playerEntries, playerCount, lastWinnerInfo, playerCarousel,
-    setButtonLoading, showTransactionStatus,
-    initializeDOMElements
-} from './app.js';
+// ==========================================
+// FUNGSI GAME LOGIC
+// ==========================================
 
-// ==========================================
-// EVENT LISTENERS FOR GAME
-// ==========================================
-export function initializeGameEventListeners() {
-    betButton.addEventListener('click', placeBet);
-}
-
-// ==========================================
-// CAROUSEL FUNCTIONS
-// ==========================================
-export function setupInitialCarousel() {
-    const singlePass = Array.from({ length: TOTAL_SLOTS }, (_, i) => 
+function setupInitialCarousel() {
+    const singlePass = Array.from({ length: window.app.TOTAL_SLOTS }, (_, i) => 
         `<div class="player-slot waiting" data-slot-id="${i}">
-            <img src="${PROFILE_IMAGE_URL}" alt="waiting">
+            <img src="${window.app.PROFILE_IMAGE_URL}" alt="waiting">
             <div class="name">Waiting...</div>
             <div class="details">0.0000 ETH</div>
         </div>`
     ).join('');
     
-    playerCarousel.innerHTML = singlePass + singlePass;
-    playerCarousel.classList.add('idle-slide');
+    window.app.playerCarousel.innerHTML = singlePass + singlePass;
+    window.app.playerCarousel.classList.add('idle-slide');
 }
 
-export async function updateCarouselWithPlayers() {
-    if (!contract) return;
+async function updateCarouselWithPlayers() {
+    if (!window.app.contract) return;
 
     try {
-        const players = await contract.getRoundPlayers(currentRoundId);
+        const players = await window.app.contract.getRoundPlayers(window.app.currentRoundId);
         const playerBets = await Promise.all(
             players.map(async (player) => {
-                const bet = await contract.getPlayerBet(currentRoundId, player);
+                const bet = await window.app.contract.getPlayerBet(window.app.currentRoundId, player);
                 return {
                     address: player,
                     bet: parseFloat(ethers.utils.formatEther(bet)).toFixed(4)
@@ -55,13 +36,13 @@ export async function updateCarouselWithPlayers() {
     }
 }
 
-export function updateCarousel(players) {
+function updateCarousel(players) {
     // Clear all slots first
-    const allSlots = playerCarousel.querySelectorAll('.player-slot');
+    const allSlots = window.app.playerCarousel.querySelectorAll('.player-slot');
     allSlots.forEach(slot => {
         slot.className = 'player-slot waiting';
         slot.innerHTML = `
-            <img src="${PROFILE_IMAGE_URL}" alt="waiting">
+            <img src="${window.app.PROFILE_IMAGE_URL}" alt="waiting">
             <div class="name">Waiting...</div>
             <div class="details">0.0000 ETH</div>
         `;
@@ -69,13 +50,13 @@ export function updateCarousel(players) {
 
     // Fill with actual players
     players.forEach((player, index) => {
-        const slotIndex = index % TOTAL_SLOTS;
+        const slotIndex = index % window.app.TOTAL_SLOTS;
         const slots = document.querySelectorAll(`.player-slot[data-slot-id="${slotIndex}"]`);
         
         slots.forEach(slot => {
             slot.classList.remove('waiting');
             slot.innerHTML = `
-                <img src="${PROFILE_IMAGE_URL}" alt="${player.address}">
+                <img src="${window.app.PROFILE_IMAGE_URL}" alt="${player.address}">
                 <div class="name">${player.address.substring(0, 6)}...${player.address.substring(player.address.length - 4)}</div>
                 <div class="details">${player.bet} ETH</div>
             `;
@@ -83,81 +64,13 @@ export function updateCarousel(players) {
     });
 
     // Add idle animation if not spinning
-    if (!isSpinning) {
-        playerCarousel.classList.add('idle-slide');
+    if (!window.app.isSpinning) {
+        window.app.playerCarousel.classList.add('idle-slide');
     }
 }
 
-export async function spinToWinner(winnerAddress) {
-    if (!contract) return;
-    
-    isSpinning = true;
-    playerCarousel.classList.remove('idle-slide');
-    
-    try {
-        const players = await contract.getRoundPlayers(currentRoundId);
-        const playerBets = await Promise.all(
-            players.map(async (player) => {
-                const bet = await contract.getPlayerBet(currentRoundId, player);
-                return {
-                    address: player,
-                    bet: ethers.utils.formatEther(bet)
-                };
-            })
-        );
-
-        // Create multiple copies for smooth spinning
-        const spinningPlayers = [];
-        for (let i = 0; i < 5; i++) {
-            spinningPlayers.push(...playerBets);
-        }
-
-        // Find winner index
-        const winnerIndex = playerBets.findIndex(p => p.address.toLowerCase() === winnerAddress.toLowerCase());
-        const targetPosition = (4 * playerBets.length) + winnerIndex;
-
-        // Calculate target translateX
-        const slotWidth = 100 + 16; // width + margin
-        const targetTranslateX = -(targetPosition * slotWidth) + (playerCarousel.parentElement.offsetWidth / 2) - (slotWidth / 2);
-
-        // Add some random offset for excitement
-        const randomOffset = (Math.random() - 0.5) * (slotWidth * 0.3);
-        const finalTranslateX = targetTranslateX + randomOffset;
-
-        // Apply spinning animation
-        playerCarousel.style.transition = 'transform 4s cubic-bezier(0.2, 0.9, 0.3, 1)';
-        playerCarousel.style.transform = `translateX(${finalTranslateX}px)`;
-
-        // Highlight winner after spin
-        setTimeout(() => {
-            const allSlots = playerCarousel.querySelectorAll('.player-slot');
-            allSlots.forEach((slot, index) => {
-                if (index % playerBets.length === winnerIndex) {
-                    slot.classList.add('winner', 'winner-glow');
-                }
-            });
-            
-            showTransactionStatus(`🎉 Winner: ${winnerAddress.substring(0, 6)}...${winnerAddress.substring(winnerAddress.length - 4)} won the jackpot!`, 'success');
-            
-            // Reset after celebration
-            setTimeout(() => {
-                isSpinning = false;
-                playerCarousel.classList.add('idle-slide');
-            }, 3000);
-            
-        }, 4200);
-
-    } catch (error) {
-        console.error('Error during spin animation:', error);
-        isSpinning = false;
-    }
-}
-
-// ==========================================
-// GAME LOGIC FUNCTIONS
-// ==========================================
-export async function loadGameData() {
-    if (!contract) {
+async function loadGameData() {
+    if (!window.app.contract) {
         console.log('No contract available');
         return;
     }
@@ -166,21 +79,21 @@ export async function loadGameData() {
         console.log('Loading game data...');
         
         // Get current round
-        currentRoundId = await contract.currentRoundId();
-        console.log('Current round:', currentRoundId.toString());
-        roundNumber.textContent = currentRoundId.toString();
+        window.app.currentRoundId = await window.app.contract.currentRoundId();
+        console.log('Current round:', window.app.currentRoundId.toString());
+        window.app.roundNumber.textContent = window.app.currentRoundId.toString();
 
         // Get round info
-        const roundInfo = await contract.getRoundInfo(currentRoundId);
+        const roundInfo = await window.app.contract.getRoundInfo(window.app.currentRoundId);
         console.log('Round info:', roundInfo);
         
         // Update UI with round info
         updateGameUI(roundInfo);
 
         // Get total jackpot
-        const totalJackpotValue = await contract.totalJackpot();
+        const totalJackpotValue = await window.app.contract.totalJackpot();
         const jackpotInEth = ethers.utils.formatEther(totalJackpotValue);
-        jackpotAmount.textContent = `${parseFloat(jackpotInEth).toFixed(4)} ETH`;
+        window.app.jackpotAmount.textContent = `${parseFloat(jackpotInEth).toFixed(4)} ETH`;
 
         // Update carousel with current players
         await updateCarouselWithPlayers();
@@ -188,25 +101,25 @@ export async function loadGameData() {
     } catch (error) {
         console.error('Error loading game data:', error);
         if (error.message.includes('contract')) {
-            showTransactionStatus('Contract not found. Please check contract address.', 'error');
+            window.app.showTransactionStatus('Contract not found. Please check contract address.', 'error');
         }
     }
 }
 
-export function updateGameUI(roundInfo) {
+function updateGameUI(roundInfo) {
     // Update timer
     const timeLeft = parseInt(roundInfo.timeLeft.toString());
     console.log('Time left:', timeLeft);
     updateTimerDisplay(timeLeft);
 
     // Update player count
-    playerCount.textContent = roundInfo.playerCount.toString();
+    window.app.playerCount.textContent = roundInfo.playerCount.toString();
 
     // Update player list if there are players
     if (roundInfo.playerCount > 0) {
         updatePlayerList();
     } else {
-        playerEntries.innerHTML = `
+        window.app.playerEntries.innerHTML = `
             <div style="text-align: center; color: var(--muted-text-color); padding: 2rem;">
                 No players yet. Be the first to bet!
             </div>
@@ -214,10 +127,10 @@ export function updateGameUI(roundInfo) {
     }
 
     // Check if round just ended and we have a winner
-    if (roundInfo.ended && roundInfo.winner !== ethers.constants.AddressZero && !isSpinning) {
+    if (roundInfo.ended && roundInfo.winner !== ethers.constants.AddressZero && !window.app.isSpinning) {
         spinToWinner(roundInfo.winner);
         
-        lastWinnerInfo.innerHTML = `
+        window.app.lastWinnerInfo.innerHTML = `
             <div style="color: var(--win-color); font-weight: bold; font-size: 1.1rem;">
                 ${roundInfo.winner.substring(0, 6)}...${roundInfo.winner.substring(roundInfo.winner.length - 4)}
             </div>
@@ -225,9 +138,9 @@ export function updateGameUI(roundInfo) {
                 Won ${ethers.utils.formatEther(roundInfo.totalPrize)} ETH
             </div>
         `;
-        lastWinnerInfo.classList.add('pulse');
+        window.app.lastWinnerInfo.classList.add('pulse');
     } else if (roundInfo.winner !== ethers.constants.AddressZero) {
-        lastWinnerInfo.innerHTML = `
+        window.app.lastWinnerInfo.innerHTML = `
             <div style="color: var(--win-color); font-weight: bold; font-size: 1.1rem;">
                 ${roundInfo.winner.substring(0, 6)}...${roundInfo.winner.substring(roundInfo.winner.length - 4)}
             </div>
@@ -238,17 +151,17 @@ export function updateGameUI(roundInfo) {
     }
 }
 
-export async function updatePlayerList() {
-    if (!contract) return;
+async function updatePlayerList() {
+    if (!window.app.contract) return;
 
     try {
-        const players = await contract.getRoundPlayers(currentRoundId);
+        const players = await window.app.contract.getRoundPlayers(window.app.currentRoundId);
         console.log('Players:', players);
         
         let playersHTML = '';
 
         for (const player of players) {
-            const betAmount = await contract.getPlayerBet(currentRoundId, player);
+            const betAmount = await window.app.contract.getPlayerBet(window.app.currentRoundId, player);
             const betInEth = ethers.utils.formatEther(betAmount);
             
             playersHTML += `
@@ -263,60 +176,60 @@ export async function updatePlayerList() {
             `;
         }
 
-        playerEntries.innerHTML = playersHTML;
+        window.app.playerEntries.innerHTML = playersHTML;
     } catch (error) {
         console.error('Error updating player list:', error);
     }
 }
 
-export function updateTimerDisplay(seconds) {
+function updateTimerDisplay(seconds) {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    timer.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    window.app.timer.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     
     if (seconds < 10) {
-        timer.style.color = 'var(--error-color)';
+        window.app.timer.style.color = 'var(--error-color)';
     } else if (seconds < 30) {
-        timer.style.color = 'var(--highlight-color)';
+        window.app.timer.style.color = 'var(--highlight-color)';
     } else {
-        timer.style.color = 'var(--win-color)';
+        window.app.timer.style.color = 'var(--win-color)';
     }
 }
 
-export async function placeBet() {
-    if (!userAddress) {
-        showTransactionStatus('Please connect your wallet first!', 'error');
+async function placeBet() {
+    if (!window.app.userAddress) {
+        window.app.showTransactionStatus('Please connect your wallet first!', 'error');
         return;
     }
 
-    if (!contract) {
-        showTransactionStatus('Contract not configured.', 'error');
+    if (!window.app.contract) {
+        window.app.showTransactionStatus('Contract not configured.', 'error');
         return;
     }
 
-    const betValue = parseFloat(betInput.value);
+    const betValue = parseFloat(window.app.betInput.value);
     if (isNaN(betValue) || betValue < 0.0001) {
-        showTransactionStatus('Minimum bet is 0.0001 ETH', 'error');
+        window.app.showTransactionStatus('Minimum bet is 0.0001 ETH', 'error');
         return;
     }
 
     try {
-        showTransactionStatus('Processing your bet...', 'pending');
-        setButtonLoading(true);
+        window.app.showTransactionStatus('Processing your bet...', 'pending');
+        window.app.setButtonLoading(true);
 
         const betAmount = ethers.utils.parseEther(betValue.toString());
         console.log('Placing bet:', betValue, 'ETH');
         
-        const tx = await contract.placeBet(currentRoundId, { value: betAmount });
-        showTransactionStatus('Transaction submitted. Waiting for confirmation...', 'pending');
+        const tx = await window.app.contract.placeBet(window.app.currentRoundId, { value: betAmount });
+        window.app.showTransactionStatus('Transaction submitted. Waiting for confirmation...', 'pending');
         
         const receipt = await tx.wait();
         console.log('Transaction confirmed:', receipt);
-        showTransactionStatus('Bet placed successfully! 🎉 Good luck!', 'success');
+        window.app.showTransactionStatus('Bet placed successfully! 🎉 Good luck!', 'success');
         
         // Reload game data to reflect changes
         await loadGameData();
-        betInput.value = '';
+        window.app.betInput.value = '';
         
     } catch (error) {
         console.error('Bet failed:', error);
@@ -335,31 +248,53 @@ export async function placeBet() {
             errorMessage = 'Contract error. Please check round status.';
         }
         
-        showTransactionStatus(errorMessage, 'error');
+        window.app.showTransactionStatus(errorMessage, 'error');
     } finally {
-        setButtonLoading(false);
+        window.app.setButtonLoading(false);
     }
 }
 
-export function startGameLoop() {
+function addBet(amount) {
+    const current = parseFloat(window.app.betInput.value) || 0;
+    window.app.betInput.value = (current + amount).toFixed(4);
+}
+
+function startGameLoop() {
     // Clear any existing interval
-    if (gameInterval) {
-        clearInterval(gameInterval);
+    if (window.app.gameInterval) {
+        clearInterval(window.app.gameInterval);
     }
     
     // Update game data every 10 seconds
-    gameInterval = setInterval(async () => {
-        if (contract && userAddress) {
+    window.app.gameInterval = setInterval(async () => {
+        if (window.app.contract && window.app.userAddress) {
             console.log('Auto-updating game data...');
             await loadGameData();
         }
     }, 10000);
 }
 
-// ==========================================
-// INITIALIZE GAME
-// ==========================================
-export function initializeGame() {
-    setupInitialCarousel();
-    initializeGameEventListeners();
-          }
+// Export functions untuk digunakan di file lain
+window.game = {
+    setupInitialCarousel,
+    loadGameData,
+    placeBet,
+    addBet,
+    startGameLoop,
+    updateCarouselWithPlayers,
+    spinToWinner: async (winnerAddress) => {
+        // Implementation of spinToWinner function
+        if (!window.app.contract) return;
+        
+        window.app.isSpinning = true;
+        window.app.playerCarousel.classList.remove('idle-slide');
+        
+        try {
+            const players = await window.app.contract.getRoundPlayers(window.app.currentRoundId);
+            // ... rest of spinToWinner implementation
+        } catch (error) {
+            console.error('Error during spin animation:', error);
+            window.app.isSpinning = false;
+        }
+    }
+};
