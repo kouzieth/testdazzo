@@ -5,7 +5,7 @@
 // Buat object window.app terlebih dahulu
 window.app = {
     // 🔑 GANTI DENGAN PRIVY APP ID ANDA
-    PRIVY_APP_ID: 'clpispdty00ycl80fpueukbhl', // ⚠️ Ganti dengan App ID Anda!
+    PRIVY_APP_ID: 'cmgb2kkqc000kkv0d96pfrstl', // ⚠️ Ganti dengan App ID Anda!
 
     // Konfigurasi Contract
     CONTRACT_ADDRESS: "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b",
