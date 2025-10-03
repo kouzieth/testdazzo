@@ -4,9 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DOZZO - Onchain Jackpot Game</title>
-    <script src="https://cdn.jsdelivr.net/npm/web3modal@1.9.12/dist/index.min.js"></script>
+    <!-- HAPUS WalletConnect v1, GUNAKAN Ethers.js saja -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
     <style>
         :root {
             --bg-color: #0f0f23;
@@ -197,7 +196,7 @@
         .waiting-players {
             display: flex;
             width: fit-content;
-            transition: transform 4s cubic-bezier(0.2, 0.9, 0.3, 1);
+            transition: transform 5s cubic-bezier(0.2, 0.9, 0.3, 1);
         }
         
         .player-slot {
@@ -503,9 +502,9 @@
 
     <script>
         // ==========================================
-        // KONFIGURASI - GANTI DENGAN CONTRACT BARU ANDA
+        // KONFIGURASI - GANTI DENGAN CONTRACT ANDA
         // ==========================================
-        const CONTRACT_ADDRESS = "0xB4BA0d964CB4Ef4c2CEC675299e1058102435b1b"; // Ganti dengan contract baru 1 menit
+        const CONTRACT_ADDRESS = "0x782C053522Bb175e364A862Ca5F2F161E1b114f4"; // Contract address Anda
         const CONTRACT_ABI = [
             "function placeBet(uint256 _roundId) external payable",
             "function endRound(uint256 _roundId) external",
@@ -518,24 +517,21 @@
             "event RoundEnded(uint256 roundId, address winner, uint256 amount)"
         ];
 
-        // Web3Modal Configuration
-        const providerOptions = {
-            walletconnect: {
-                package: window.WalletConnectProvider.default,
-                options: {
-                    infuraId: "27e484dcd9e3efcfd25a83a78777cdf1"
-                }
+        // Base Network Configuration
+        const BASE_SEPOLIA = {
+            chainId: '0x14a34',
+            chainName: 'Base Sepolia',
+            rpcUrls: ['https://sepolia.base.org'],
+            blockExplorerUrls: ['https://sepolia.basescan.org/'],
+            nativeCurrency: {
+                name: 'Ethereum',
+                symbol: 'ETH',
+                decimals: 18
             }
         };
 
-        const web3Modal = new window.Web3Modal.default({
-            providerOptions,
-            cacheProvider: false,
-            theme: "dark"
-        });
-
         // Global Variables
-        let provider, signer, contract, userAddress, web3ModalProvider;
+        let provider, signer, contract, userAddress;
         let currentRoundId = 1;
         let gameInterval;
         let isSpinning = false;
@@ -561,7 +557,12 @@
         const transactionStatus = document.getElementById('transaction-status');
         const playerCarousel = document.getElementById('player-carousel');
 
-        // Initialize App State
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAppState();
+            initApp();
+        });
+
         function initializeAppState() {
             walletInfo.classList.add('hidden');
             connectWalletBtn.style.display = 'block';
@@ -569,33 +570,157 @@
             walletAddress.textContent = '';
         }
 
-        // Initialize App
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeAppState();
-            initApp();
-        });
-
         async function initApp() {
             connectWalletBtn.addEventListener('click', connectWallet);
             disconnectWalletBtn.addEventListener('click', disconnectWallet);
             betButton.addEventListener('click', placeBet);
 
-            // Cek jika sudah ada koneksi sebelumnya
-            try {
-                if (typeof window.ethereum !== 'undefined') {
+            // Cek jika MetaMask sudah terinstall
+            if (typeof window.ethereum !== 'undefined') {
+                console.log('MetaMask detected!');
+                try {
                     provider = new ethers.providers.Web3Provider(window.ethereum);
-                    const accounts = await provider.listAccounts();
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
                     if (accounts.length > 0) {
                         await handleWalletConnected(accounts[0]);
                     }
+                } catch (error) {
+                    console.log('No previous connection found');
                 }
-            } catch (error) {
-                console.log('No previous connection found');
+            } else {
+                showTransactionStatus('Please install MetaMask!', 'error');
+                connectWalletBtn.disabled = true;
+                connectWalletBtn.textContent = 'Install MetaMask';
             }
 
-            // Initialize carousel with empty slots
             setupInitialCarousel();
             startGameLoop();
+        }
+
+        // SIMPLIFIED WALLET CONNECTION - Hanya MetaMask
+        async function connectWallet() {
+            if (typeof window.ethereum === 'undefined') {
+                showTransactionStatus('Please install MetaMask browser extension!', 'error');
+                return;
+            }
+
+            try {
+                showTransactionStatus('Connecting to MetaMask...', 'pending');
+                
+                // Request account access
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                // Switch to Base network
+                await switchToBaseNetwork();
+                
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                const accounts = await provider.listAccounts();
+                
+                if (accounts.length > 0) {
+                    await handleWalletConnected(accounts[0]);
+                }
+                
+            } catch (error) {
+                console.error('Wallet connection failed:', error);
+                let errorMessage = 'Connection failed';
+                
+                if (error.code === 4001) {
+                    errorMessage = 'Connection rejected by user';
+                } else if (error.code === -32002) {
+                    errorMessage = 'Connection already pending. Please check MetaMask';
+                }
+                
+                showTransactionStatus(errorMessage, 'error');
+                initializeAppState();
+            }
+        }
+
+        async function switchToBaseNetwork() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: BASE_SEPOLIA.chainId }],
+                });
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [BASE_SEPOLIA],
+                        });
+                    } catch (addError) {
+                        throw new Error('Failed to add Base network to MetaMask');
+                    }
+                }
+                throw switchError;
+            }
+        }
+
+        async function handleWalletConnected(address) {
+            userAddress = address;
+            signer = provider.getSigner();
+            contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+            // Update UI
+            connectWalletBtn.style.display = 'none';
+            walletInfo.classList.remove('hidden');
+            walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+            
+            await checkNetwork();
+            showTransactionStatus('Wallet connected successfully! 🎉', 'success');
+            
+            await loadGameData();
+
+            // Listen for account changes
+            window.ethereum.on('accountsChanged', handleAccountsChanged);
+            window.ethereum.on('chainChanged', handleChainChanged);
+        }
+
+        async function checkNetwork() {
+            try {
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                if (chainId === BASE_SEPOLIA.chainId) {
+                    networkIndicator.textContent = 'Base Sepolia';
+                    networkIndicator.className = 'network-indicator network-base';
+                } else if (chainId === '0x1') {
+                    networkIndicator.textContent = 'Ethereum';
+                    networkIndicator.className = 'network-indicator network-wrong';
+                    showTransactionStatus('Please switch to Base Sepolia network', 'error');
+                } else {
+                    networkIndicator.textContent = 'Wrong Network';
+                    networkIndicator.className = 'network-indicator network-wrong';
+                    showTransactionStatus('Please switch to Base Sepolia network', 'error');
+                }
+            } catch (error) {
+                console.error('Error checking network:', error);
+            }
+        }
+
+        function disconnectWallet() {
+            userAddress = null;
+            contract = null;
+            
+            // Remove event listeners
+            if (window.ethereum.removeListener) {
+                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+                window.ethereum.removeListener('chainChanged', handleChainChanged);
+            }
+            
+            initializeAppState();
+            showTransactionStatus('Wallet disconnected', 'success');
+        }
+
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                disconnectWallet();
+            } else if (accounts[0] !== userAddress) {
+                handleWalletConnected(accounts[0]);
+            }
+        }
+
+        function handleChainChanged(chainId) {
+            window.location.reload();
         }
 
         // Carousel Functions
@@ -609,19 +734,22 @@
             ).join('');
             
             playerCarousel.innerHTML = singlePass + singlePass;
-            // Tambahkan animasi idle
-            playerCarousel.style.animation = 'continuous-slide 30s linear infinite';
+            
+            // Add CSS for idle animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes continuous-slide {
+                    from { transform: translateX(0); }
+                    to { transform: translateX(-50%); }
+                }
+                .idle-slide {
+                    animation: continuous-slide 30s linear infinite;
+                }
+            `;
+            document.head.appendChild(style);
+            
+            playerCarousel.classList.add('idle-slide');
         }
-
-        // Tambahkan keyframes untuk animasi continuous-slide
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes continuous-slide {
-                from { transform: translateX(0); }
-                to { transform: translateX(-50%); }
-            }
-        `;
-        document.head.appendChild(style);
 
         async function updateCarouselWithPlayers() {
             if (!contract) return;
@@ -645,7 +773,7 @@
         }
 
         function updateCarousel(players) {
-            // Clear existing players
+            // Clear all slots first
             const allSlots = playerCarousel.querySelectorAll('.player-slot');
             allSlots.forEach(slot => {
                 slot.className = 'player-slot waiting';
@@ -671,11 +799,9 @@
                 });
             });
 
-            // Jika tidak ada pemain, tetap idle animation
-            if (players.length === 0) {
-                playerCarousel.style.animation = 'continuous-slide 30s linear infinite';
-            } else {
-                playerCarousel.style.animation = 'none';
+            // Add idle animation if not spinning
+            if (!isSpinning) {
+                playerCarousel.classList.add('idle-slide');
             }
         }
 
@@ -683,7 +809,7 @@
             if (!contract) return;
             
             isSpinning = true;
-            playerCarousel.style.animation = 'none';
+            playerCarousel.classList.remove('idle-slide');
             
             try {
                 const players = await contract.getRoundPlayers(currentRoundId);
@@ -733,15 +859,7 @@
                     // Reset after celebration
                     setTimeout(() => {
                         isSpinning = false;
-                        // Kembalikan ke posisi awal dengan animasi idle
-                        playerCarousel.style.transition = 'none';
-                        playerCarousel.style.transform = 'translateX(0)';
-                        // Hapus class winner
-                        allSlots.forEach(slot => slot.classList.remove('winner', 'winner-glow'));
-                        // Setelah reset, mulai lagi animasi idle
-                        setTimeout(() => {
-                            playerCarousel.style.animation = 'continuous-slide 30s linear infinite';
-                        }, 100);
+                        playerCarousel.classList.add('idle-slide');
                     }, 3000);
                     
                 }, 4200);
@@ -750,97 +868,6 @@
                 console.error('Error during spin animation:', error);
                 isSpinning = false;
             }
-        }
-
-        async function connectWallet() {
-            try {
-                showTransactionStatus('Connecting wallet...', 'pending');
-                
-                // Connect using Web3Modal
-                web3ModalProvider = await web3Modal.connect();
-                provider = new ethers.providers.Web3Provider(web3ModalProvider);
-                signer = provider.getSigner();
-                
-                const address = await signer.getAddress();
-                await handleWalletConnected(address);
-                
-            } catch (error) {
-                console.error('Wallet connection failed:', error);
-                showTransactionStatus('Connection failed: ' + error.message, 'error');
-                initializeAppState();
-            }
-        }
-
-        async function handleWalletConnected(address) {
-            userAddress = address;
-            
-            // Initialize contract
-            contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-            connectWalletBtn.style.display = 'none';
-            walletInfo.classList.remove('hidden');
-            walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-            
-            await checkNetwork();
-            showTransactionStatus('Wallet connected successfully! 🎉', 'success');
-            
-            await loadGameData();
-
-            // Setup event listeners for Web3Modal provider
-            if (web3ModalProvider.on) {
-                web3ModalProvider.on('accountsChanged', handleAccountsChanged);
-                web3ModalProvider.on('chainChanged', handleChainChanged);
-                web3ModalProvider.on('disconnect', handleDisconnect);
-            }
-        }
-
-        async function checkNetwork() {
-            try {
-                const network = await provider.getNetwork();
-                const chainId = network.chainId.toString();
-                
-                // Base Sepolia chain ID
-                if (chainId === '84532') {
-                    networkIndicator.textContent = 'Base Sepolia';
-                    networkIndicator.className = 'network-indicator network-base';
-                } else if (chainId === '8453') {
-                    networkIndicator.textContent = 'Base Mainnet';
-                    networkIndicator.className = 'network-indicator network-base';
-                } else {
-                    networkIndicator.textContent = 'Wrong Network';
-                    networkIndicator.className = 'network-indicator network-wrong';
-                    showTransactionStatus('Please switch to Base Sepolia network', 'error');
-                }
-            } catch (error) {
-                console.error('Error checking network:', error);
-            }
-        }
-
-        function disconnectWallet() {
-            if (web3Modal && web3Modal.clearCachedProvider) {
-                web3Modal.clearCachedProvider();
-            }
-            
-            userAddress = null;
-            contract = null;
-            initializeAppState();
-            showTransactionStatus('Wallet disconnected', 'success');
-        }
-
-        function handleAccountsChanged(accounts) {
-            if (accounts.length === 0) {
-                disconnectWallet();
-            } else if (accounts[0] !== userAddress) {
-                handleWalletConnected(accounts[0]);
-            }
-        }
-
-        function handleChainChanged(chainId) {
-            window.location.reload();
-        }
-
-        function handleDisconnect() {
-            disconnectWallet();
         }
 
         async function loadGameData() {
@@ -862,9 +889,6 @@
 
             } catch (error) {
                 console.error('Error loading game data:', error);
-                if (error.message.includes('contract')) {
-                    showTransactionStatus('Contract not found. Please check contract address.', 'error');
-                }
             }
         }
 
@@ -1051,4 +1075,4 @@
         });
     </script>
 </body>
-    </html>
+                        </html>
