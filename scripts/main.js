@@ -1,22 +1,23 @@
-import { initializeDOMElements } from './app.js';
-import { initializePrivy, initializeWalletEventListeners } from './wallet.js';
-import { initializeGame } from './game.js';
-
 // ==========================================
 // INITIALIZE APPLICATION
 // ==========================================
+
 function initApp() {
     console.log('Initializing app...');
     
     // Initialize DOM elements
-    initializeDOMElements();
+    window.app.initializeDOMElements();
     
     // Initialize event listeners
-    initializeWalletEventListeners();
-    initializeGame();
+    window.app.connectWalletBtn.addEventListener('click', window.wallet.connectWallet);
+    window.app.disconnectWalletBtn.addEventListener('click', window.wallet.disconnectWallet);
+    window.app.betButton.addEventListener('click', window.game.placeBet);
+    
+    // Initialize game components
+    window.game.setupInitialCarousel();
     
     // Initialize Privy
-    initializePrivy();
+    window.wallet.initializePrivy();
 }
 
 // Initialize App ketika DOM siap
@@ -27,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Cleanup ketika window di-close
 window.addEventListener('beforeunload', () => {
-    if (gameInterval) {
-        clearInterval(gameInterval);
+    if (window.app.gameInterval) {
+        clearInterval(window.app.gameInterval);
     }
 });
