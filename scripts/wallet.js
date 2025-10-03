@@ -1,17 +1,8 @@
-import { 
-    PRIVY_APP_ID, 
-    initializeDOMElements, 
-    showTransactionStatus,
-    provider, signer, contract, userAddress, privyClient,
-    connectWalletBtn, disconnectWalletBtn, walletInfo, walletAddress, networkIndicator
-} from './app.js';
-
-import { startGameLoop, loadGameData } from './game.js';
-
 // ==========================================
-// INISIALISASI PRIVY
+// FUNGSI WALLET CONNECTION DENGAN PRIVY
 // ==========================================
-export async function initializePrivy() {
+
+async function initializePrivy() {
     try {
         console.log('Checking Privy availability...');
         
@@ -24,9 +15,9 @@ export async function initializePrivy() {
 
         console.log('Privy SDK found, initializing...');
         
-        // Initialize Privy client [citation:4]
-        privyClient = window.privy.initializePrivy({
-            appId: PRIVY_APP_ID,
+        // Initialize Privy client dengan konfigurasi khusus
+        window.app.privyClient = window.privy.initializePrivy({
+            appId: window.app.PRIVY_APP_ID,
             config: {
                 // ✅ HANYA 2 METODE LOGIN: External Wallet + Farcaster
                 loginMethods: ['farcaster', 'wallet'],
@@ -50,10 +41,10 @@ export async function initializePrivy() {
         console.log('Privy initialized successfully');
         
         // Check jika user sudah login
-        const isAuthenticated = await privyClient.isAuthenticated();
+        const isAuthenticated = await window.app.privyClient.isAuthenticated();
         if (isAuthenticated) {
             console.log('User already authenticated');
-            const user = await privyClient.getUser();
+            const user = await window.app.privyClient.getUser();
             if (user.wallet) {
                 await handleWalletConnected(user.wallet.address);
             }
@@ -63,85 +54,82 @@ export async function initializePrivy() {
 
     } catch (error) {
         console.error('Failed to initialize Privy:', error);
-        showTransactionStatus('Failed to initialize wallet connection: ' + error.message, 'error');
+        window.app.showTransactionStatus('Failed to initialize wallet connection: ' + error.message, 'error');
         
         // Coba lagi setelah 3 detik
         setTimeout(initializePrivy, 3000);
     }
 }
 
-// ==========================================
-// FUNGSI WALLET CONNECTION
-// ==========================================
-export async function connectWallet() {
-    if (!privyClient) {
-        showTransactionStatus('Wallet connection not ready. Please wait...', 'error');
+async function connectWallet() {
+    if (!window.app.privyClient) {
+        window.app.showTransactionStatus('Wallet connection not ready. Please wait...', 'error');
         return;
     }
 
     try {
-        showTransactionStatus('Opening Privy login...', 'pending');
+        window.app.showTransactionStatus('Opening Privy login...', 'pending');
         
-        // Login dengan Privy [citation:3]
-        await privyClient.login();
+        // Login dengan Privy [citation:4]
+        await window.app.privyClient.login();
         
         // Setelah login, dapatkan data user
-        const user = await privyClient.getUser();
+        const user = await window.app.privyClient.getUser();
         if (user.wallet) {
             await handleWalletConnected(user.wallet.address);
         } else {
-            showTransactionStatus('No wallet found after login', 'error');
+            window.app.showTransactionStatus('No wallet found after login', 'error');
         }
         
     } catch (error) {
         console.error('Wallet connection failed:', error);
-        showTransactionStatus('Connection failed: ' + error.message, 'error');
+        window.app.showTransactionStatus('Connection failed: ' + error.message, 'error');
     }
 }
 
-export async function handleWalletConnected(address) {
+async function handleWalletConnected(address) {
     console.log('Wallet connected:', address);
     
-    userAddress = address;
+    window.app.userAddress = address;
     
     try {
-        // Dapatkan provider dari Privy [citation:3]
-        const privyProvider = await privyClient.getEthereumProvider();
-        provider = new ethers.providers.Web3Provider(privyProvider);
-        signer = provider.getSigner();
-        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        // Dapatkan provider dari Privy
+        const privyProvider = await window.app.privyClient.getEthereumProvider();
+        window.app.provider = new ethers.providers.Web3Provider(privyProvider);
+        window.app.signer = window.app.provider.getSigner();
+        window.app.contract = new ethers.Contract(window.app.CONTRACT_ADDRESS, window.app.CONTRACT_ABI, window.app.signer);
 
         // Update UI
-        connectWalletBtn.style.display = 'none';
-        walletInfo.style.display = 'flex';
-        walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+        window.app.connectWalletBtn.style.display = 'none';
+        window.app.walletInfo.style.display = 'flex';
+        window.app.walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
         
         await checkNetwork();
-        showTransactionStatus('Wallet connected successfully! 🎉', 'success');
+        window.app.showTransactionStatus('Wallet connected successfully! 🎉', 'success');
         
         // Start loading game data
-        await loadGameData();
-        startGameLoop();
+        await window.game.loadGameData();
+        window.game.startGameLoop();
         
     } catch (error) {
         console.error('Error setting up wallet connection:', error);
-        showTransactionStatus('Error setting up connection: ' + error.message, 'error');
+        window.app.showTransactionStatus('Error setting up connection: ' + error.message, 'error');
     }
 }
 
-export async function checkNetwork() {
+async function checkNetwork() {
     try {
-        if (provider) {
-            const network = await provider.getNetwork();
+        if (window.app.provider) {
+            const network = await window.app.provider.getNetwork();
             console.log('Current network:', network);
             
             if (network.chainId === 84532) { // Base Sepolia
-                networkIndicator.textContent = 'Base Sepolia';
-                networkIndicator.className = 'network-indicator network-base';
+                window.app.networkIndicator.textContent = 'Base Sepolia';
+                window.app.networkIndicator.className = 'network-indicator network-base';
             } else {
-                networkIndicator.textContent = 'Wrong Network';
-                networkIndicator.className = 'network-indicator network-wrong';
-                showTransactionStatus('Please switch to Base Sepolia in your wallet', 'error');
+                window.app.networkIndicator.textContent = 'Wrong Network';
+                window.app.networkIndicator.className = 'network-indicator network-wrong';
+                window.app.showTransactionStatus('Please switch to Base Sepolia in your wallet', 'error');
             }
         }
     } catch (error) {
@@ -149,36 +137,37 @@ export async function checkNetwork() {
     }
 }
 
-export async function disconnectWallet() {
+async function disconnectWallet() {
     console.log('Disconnecting wallet');
     
-    // Logout dari Privy [citation:3]
-    if (privyClient) {
-        await privyClient.logout();
+    // Logout dari Privy
+    if (window.app.privyClient) {
+        await window.app.privyClient.logout();
     }
     
-    userAddress = null;
-    contract = null;
-    provider = null;
-    signer = null;
+    window.app.userAddress = null;
+    window.app.contract = null;
+    window.app.provider = null;
+    window.app.signer = null;
     
     // Reset UI
-    connectWalletBtn.style.display = 'block';
-    walletInfo.style.display = 'none';
-    walletAddress.textContent = '';
+    window.app.connectWalletBtn.style.display = 'block';
+    window.app.walletInfo.style.display = 'none';
+    window.app.walletAddress.textContent = '';
     
     // Stop game loop
-    if (gameInterval) {
-        clearInterval(gameInterval);
+    if (window.app.gameInterval) {
+        clearInterval(window.app.gameInterval);
     }
     
-    showTransactionStatus('Wallet disconnected', 'success');
+    window.app.showTransactionStatus('Wallet disconnected', 'success');
 }
 
-// ==========================================
-// EVENT LISTENERS
-// ==========================================
-export function initializeWalletEventListeners() {
-    connectWalletBtn.addEventListener('click', connectWallet);
-    disconnectWalletBtn.addEventListener('click', disconnectWallet);
-}
+// Export functions untuk digunakan di file lain
+window.wallet = {
+    initializePrivy,
+    connectWallet,
+    disconnectWallet,
+    checkNetwork,
+    handleWalletConnected
+};
