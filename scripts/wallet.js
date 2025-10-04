@@ -6,7 +6,6 @@ async function initializePrivy() {
     try {
         console.log('Checking Privy availability...');
         
-        // Tunggu hingga Privy SDK siap
         if (!window.privy) {
             console.log('Privy not loaded yet, waiting...');
             setTimeout(initializePrivy, 1000);
@@ -15,23 +14,18 @@ async function initializePrivy() {
 
         console.log('Privy SDK found, initializing...');
         
-        // Initialize Privy client dengan konfigurasi khusus
+        // [PERUBAHAN] Update konfigurasi untuk Farcaster
         window.app.privyClient = window.privy.initializePrivy({
             appId: window.app.PRIVY_APP_ID,
             config: {
-                // ✅ HANYA 2 METODE LOGIN: External Wallet + Farcaster
                 loginMethods: ['farcaster', 'wallet'],
-                
-                // ✅ KONFIGURASI WALLET
-                externalWallets: {
-                    showAllWallets: true,
+                farcaster: {
+                    createSigner: true,
                 },
-                
                 appearance: {
                     theme: 'dark',
-                    accentColor: '#764fff'
+                    accentColor: '#764fff',
                 },
-                
                 embeddedWallets: {
                     createOnLogin: 'users-without-wallets'
                 }
@@ -40,7 +34,6 @@ async function initializePrivy() {
 
         console.log('Privy initialized successfully');
         
-        // Check jika user sudah login
         const isAuthenticated = await window.app.privyClient.isAuthenticated();
         if (isAuthenticated) {
             console.log('User already authenticated');
@@ -55,9 +48,6 @@ async function initializePrivy() {
     } catch (error) {
         console.error('Failed to initialize Privy:', error);
         window.app.showTransactionStatus('Failed to initialize wallet connection: ' + error.message, 'error');
-        
-        // Coba lagi setelah 3 detik
-        setTimeout(initializePrivy, 3000);
     }
 }
 
@@ -68,12 +58,8 @@ async function connectWallet() {
     }
 
     try {
-        window.app.showTransactionStatus('Opening Privy login...', 'pending');
-        
-        // Login dengan Privy [citation:4]
         await window.app.privyClient.login();
         
-        // Setelah login, dapatkan data user
         const user = await window.app.privyClient.getUser();
         if (user.wallet) {
             await handleWalletConnected(user.wallet.address);
@@ -87,27 +73,43 @@ async function connectWallet() {
     }
 }
 
+// [PERUBAHAN BESAR] Fungsi ini diubah untuk menampilkan data Farcaster
 async function handleWalletConnected(address) {
     console.log('Wallet connected:', address);
     
     window.app.userAddress = address;
     
     try {
-        // Dapatkan provider dari Privy
         const privyProvider = await window.app.privyClient.getEthereumProvider();
         window.app.provider = new ethers.providers.Web3Provider(privyProvider);
         window.app.signer = window.app.provider.getSigner();
         window.app.contract = new ethers.Contract(window.app.CONTRACT_ADDRESS, window.app.CONTRACT_ABI, window.app.signer);
 
+        // Dapatkan data pengguna lengkap dari Privy
+        const user = await window.app.privyClient.getUser();
+        window.app.user = user; // Simpan data user secara global untuk digunakan nanti
+
+        const userPfpEl = document.getElementById('user-pfp');
+        const walletAddressEl = document.getElementById('wallet-address');
+
+        // Cek apakah pengguna punya akun Farcaster yang terhubung
+        if (user.farcaster) {
+            userPfpEl.src = user.farcaster.pfp;
+            userPfpEl.style.display = 'block';
+            walletAddressEl.textContent = user.farcaster.username;
+        } else {
+            // Jika tidak, tampilkan alamat wallet
+            userPfpEl.style.display = 'none';
+            walletAddressEl.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+        }
+
         // Update UI
         window.app.connectWalletBtn.style.display = 'none';
         window.app.walletInfo.style.display = 'flex';
-        window.app.walletAddress.textContent = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
         
         await checkNetwork();
         window.app.showTransactionStatus('Wallet connected successfully! 🎉', 'success');
         
-        // Start loading game data
         await window.game.loadGameData();
         window.game.startGameLoop();
         
@@ -121,8 +123,6 @@ async function checkNetwork() {
     try {
         if (window.app.provider) {
             const network = await window.app.provider.getNetwork();
-            console.log('Current network:', network);
-            
             if (network.chainId === 84532) { // Base Sepolia
                 window.app.networkIndicator.textContent = 'Base Sepolia';
                 window.app.networkIndicator.className = 'network-indicator network-base';
@@ -138,24 +138,19 @@ async function checkNetwork() {
 }
 
 async function disconnectWallet() {
-    console.log('Disconnecting wallet');
-    
-    // Logout dari Privy
     if (window.app.privyClient) {
         await window.app.privyClient.logout();
     }
     
     window.app.userAddress = null;
+    window.app.user = null; // Hapus data user
     window.app.contract = null;
     window.app.provider = null;
     window.app.signer = null;
     
-    // Reset UI
     window.app.connectWalletBtn.style.display = 'block';
     window.app.walletInfo.style.display = 'none';
-    window.app.walletAddress.textContent = '';
     
-    // Stop game loop
     if (window.app.gameInterval) {
         clearInterval(window.app.gameInterval);
     }
@@ -163,7 +158,6 @@ async function disconnectWallet() {
     window.app.showTransactionStatus('Wallet disconnected', 'success');
 }
 
-// Export functions untuk digunakan di file lain
 window.wallet = {
     initializePrivy,
     connectWallet,
